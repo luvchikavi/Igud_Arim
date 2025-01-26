@@ -4,3 +4,4 @@ numpy
 fpdf
 numpy-financial
 altair
+scipy
