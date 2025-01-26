@@ -195,15 +195,15 @@ def main():
         st.image("oporto_logo.png", width=180)
 
         st.markdown("""
-        **Oporto-Carbon**  specializes in sustainability consulting and carbon management solutions. "
-        "With a proven track record of helping organizations achieve their ESG goals, Oporto Carbon is "
-        "a trusted partner for businesses navigating the complexities of climate change and regulatory compliance."
+        **Oporto-Carbon**  specializes in sustainability consulting and carbon management solutions. 
+        With a proven track record of helping organizations achieve their ESG goals, Oporto Carbon is 
+        a trusted partner for businesses navigating the complexities of climate change and regulatory compliance.
         """)
         st.markdown("""
         
-        **Dr. Avi Luvchik** is the founder and CEO of Oporto Carbon. With extensive experience in sustainability "
-        "and emissions reduction strategies, Dr. Luvchik has been instrumental in developing innovative solutions "
-        "for organizations worldwide. His leadership and expertise drive the success of Oporto Carbon's projects."
+        **Dr. Avi Luvchik** is the founder and CEO of Oporto Carbon. With extensive experience in sustainability 
+        and emissions reduction strategies, Dr. Luvchik has been instrumental in developing innovative solutions 
+        for organizations worldwide. His leadership and expertise drive the success of Oporto Carbon's projects.
         """)
         show_footer()
 
