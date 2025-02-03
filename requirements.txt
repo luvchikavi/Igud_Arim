@@ -5,3 +5,6 @@ fpdf
 numpy-financial
 altair
 scipy
+plotly
+fpdf
+
