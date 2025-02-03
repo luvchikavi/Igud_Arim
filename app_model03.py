@@ -210,7 +210,7 @@ def main():
             # Try to load and display the high-resolution logo PDF if desired,
             # or use the SVG version. Here we use the SVG version via components.html.
             try:
-                with open("oporto_logo.svg", "r", encoding="utf-8") as f:
+                with open("oporto_logo.png", "r", encoding="utf-8") as f:
                     svg_code = f.read()
                 # Wrap the SVG in a div with a fixed height
                 components.html(f'<div style="height:180px; width:auto;">{svg_code}</div>', height=180)
