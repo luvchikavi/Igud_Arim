@@ -207,15 +207,11 @@ def main():
         with col1:
             st.title("Gasification Feasibility Tool")
         with col2:
-            # Try to load and display the high-resolution logo PDF if desired,
-            # or use the SVG version. Here we use the SVG version via components.html.
             try:
-                with open("oporto_logo.png", "r", encoding="utf-8") as f:
-                    svg_code = f.read()
-                # Wrap the SVG in a div with a fixed height
-                components.html(f'<div style="height:180px; width:auto;">{svg_code}</div>', height=180)
+                st.image("oporto_logo.png", width=180)
             except Exception as e:
                 st.error(f"Error loading logo: {e}")
+
         st.markdown("""
 Welcome to Oporto-Carbon's Gasification Feasibility Tool.  
 This tool evaluates the economic and environmental performance of a gasification facility.
