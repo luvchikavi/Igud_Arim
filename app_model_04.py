@@ -66,7 +66,6 @@ ENHANCED_INPUT_DATA = {
         "base_opex_usd_year1": 6_000_000,
         "inflation_rate_pct": 2.0,
         # Removed the maintenance schedule lines
-        # "maintenance_schedule": {5: 1_000_000, 10: 2_000_000},  # <-- Removed
         "tipping_fee_usd_per_ton": 90.0
     },
     "financing": {
@@ -93,8 +92,7 @@ ENHANCED_INPUT_DATA = {
 FEEDSTOCKS = {
     "RDF": {
         "fraction": 0.70,
-        # Will override with user’s choice of kWh/ton if needed,
-        # but let's keep the default 550 here for the code's internal reference
+        # Will override with user’s choice of kWh/ton if needed
         "electricity_kwh_per_ton": 550,
         "ghg_facility_kg_per_ton": 566.5
     },
@@ -228,15 +226,17 @@ def main():
     # TAB 0: HOME
     ###########################################################################
     with tabs[0]:
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.title("Gasification Feasibility Tool")
-    with col2:
-        try:
-            st.image("oporto_logo.png", use_column_width=True)
-        except Exception as e:
-            st.error(f"Error loading logo: {e}")
-    st.markdown("""
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.title("Gasification Feasibility Tool")
+        with col2:
+            # Here we try to load and display the PNG file
+            try:
+                st.image("oporto_logo.png", use_column_width=True)
+            except Exception as e:
+                st.error(f"Error loading logo: {e}")
+
+        st.markdown("""
 Welcome to Oporto-Carbon's Gasification Feasibility Tool.  
 This tool evaluates the economic and environmental performance of a gasification facility.
 """)
@@ -352,9 +352,9 @@ This tool evaluates the economic and environmental performance of a gasification
             fee_mode = st.session_state.get("fee_mode", "Both")
             revs = compute_revenue_pie(daily_capacity, FEEDSTOCKS, ENHANCED_INPUT_DATA, fee_mode=fee_mode)
             
-            # Environmental Metrics (e.g., water usage and particulate emissions)
-            water_usage = daily_capacity * ENHANCED_INPUT_DATA["facility"]["operational_days"] * 1.0  # 1 m³ per ton
-            particulate_emissions = daily_capacity * ENHANCED_INPUT_DATA["facility"]["operational_days"] * 0.05  # 0.05 kg per ton
+            # Environmental Metrics
+            water_usage = daily_capacity * ENHANCED_INPUT_DATA["facility"]["operational_days"] * 1.0
+            particulate_emissions = daily_capacity * ENHANCED_INPUT_DATA["facility"]["operational_days"] * 0.05
             
             st.write("#### Single Scenario Results")
             df_single = pd.DataFrame([{
