@@ -233,7 +233,7 @@ def main():
             st.title("Gasification Feasibility Tool")
         with col2:
             try:
-                with open("oporto_logo.svg", "r", encoding="utf-8") as f:
+                with open("oporto_logo.png", "r", encoding="utf-8") as f:
                     svg_code = f.read()
                 components.html(f'<div style="height:180px; width:auto;">{svg_code}</div>', height=180)
             except Exception as e:
