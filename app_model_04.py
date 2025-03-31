@@ -226,21 +226,21 @@ def main():
     # TAB 0: HOME
     ###########################################################################
     with tabs[0]:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.title("Gasification Feasibility Tool")
-        with col2:
-            # Here we try to load and display the PNG file
-            try:
-                st.image("oporto_logo.png", use_column_width=True)
-            except Exception as e:
-                st.error(f"Error loading logo: {e}")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("Gasification Feasibility Tool")
+    with col2:
+        # Display the PNG file using use_container_width
+        try:
+            st.image("oporto_logo.png", use_container_width=True)
+        except Exception as e:
+            st.error(f"Error loading logo: {e}")
 
-        st.markdown("""
+    st.markdown("""
 Welcome to Oporto-Carbon's Gasification Feasibility Tool.  
 This tool evaluates the economic and environmental performance of a gasification facility.
 """)
-        show_footer()
+    show_footer()
     
     ###########################################################################
     # TAB 1: BASE INPUT DATA
