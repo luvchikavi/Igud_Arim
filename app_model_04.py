@@ -65,7 +65,6 @@ ENHANCED_INPUT_DATA = {
         "municipal_treatment_cost_usd_per_ton": 114.0,
         "base_opex_usd_year1": 6_000_000,
         "inflation_rate_pct": 2.0,
-        # Removed the maintenance schedule lines
         "tipping_fee_usd_per_ton": 90.0
     },
     "financing": {
@@ -80,9 +79,7 @@ ENHANCED_INPUT_DATA = {
         "methane_factor_kg_co2eq_per_ton": 100
     },
     "trucking": {
-        # Default to 15 but we’ll override with dropdown for 15 or 18
         "truck_capacity_tons": 15,
-        # Default 400 but we’ll add a dropdown with 400, 450, 500
         "distance_to_landfill_km": 400,
         "emission_factor_kgco2_per_km": 2.26
     }
@@ -92,7 +89,6 @@ ENHANCED_INPUT_DATA = {
 FEEDSTOCKS = {
     "RDF": {
         "fraction": 0.70,
-        # Will override with user’s choice of kWh/ton if needed
         "electricity_kwh_per_ton": 550,
         "ghg_facility_kg_per_ton": 566.5
     },
@@ -128,10 +124,12 @@ def format_numbers(df, fmt="{:,.2f}"):
     """
     Applies comma formatting to all numeric columns in df 
     with the given format string (default two decimals).
+    If any column is purely text, it won't cause an error 
+    as long as it's typed as object/string, 
+    but if there's a mix within a single column, it will fail.
     """
     if df is None or df.empty:
         return df
-    # Convert numeric columns to the specified format
     return df.style.format(fmt)
 
 def compute_bau_ghg_tons(daily_capacity, input_data):
@@ -239,13 +237,11 @@ def main():
         with col1:
             st.title("Gasification Feasibility Tool")
         with col2:
-            # Display the PNG file using use_container_width
             try:
                 st.image("oporto_logo.png", use_container_width=True)
             except Exception as e:
                 st.error(f"Error loading logo: {e}")
 
-        # Show welcome text ONLY on the first page
         st.markdown("""
 Welcome to Oporto-Carbon's Gasification Feasibility Tool.  
 This tool evaluates the economic and environmental performance of a gasification facility.
@@ -268,29 +264,31 @@ This tool evaluates the economic and environmental performance of a gasification
                     items[new_key] = v
             return items
         
-        # Display the original dictionary in flattened form
         flat_input = flatten_dict(ENHANCED_INPUT_DATA)
         df_input = pd.DataFrame(list(flat_input.items()), columns=["Parameter", "Value"])
+        
+        # MINIMAL CHANGE: do NOT apply numeric formatting to df_input
+        # because it has both text and numbers
         st.write("### Core Input Parameters (Default)")
-        st.dataframe(df_input)  # no style formatting
+        st.dataframe(df_input)
         
         # Let the user override certain parameters
         st.write("### Override Key Parameters with Dropdowns")
         distance_choice = st.selectbox(
             "Distance to landfill (km)", [400, 450, 500],
-            index=[400,450,500].index(ENHANCED_INPUT_DATA["trucking"]["distance_to_landfill_km"])
+            index=[400, 450, 500].index(ENHANCED_INPUT_DATA["trucking"]["distance_to_landfill_km"])
         )
         ENHANCED_INPUT_DATA["trucking"]["distance_to_landfill_km"] = distance_choice
 
         truck_cap_choice = st.selectbox(
             "Truck Capacity (tons)", [15, 18],
-            index=[15,18].index(ENHANCED_INPUT_DATA["trucking"]["truck_capacity_tons"])
+            index=[15, 18].index(ENHANCED_INPUT_DATA["trucking"]["truck_capacity_tons"])
         )
         ENHANCED_INPUT_DATA["trucking"]["truck_capacity_tons"] = truck_cap_choice
         
         ash_choice = st.selectbox(
             "Ash Content (%)", [5, 7, 10],
-            index=[5,7,10].index(ENHANCED_INPUT_DATA["facility"]["ash_content_pct"])
+            index=[5, 7, 10].index(ENHANCED_INPUT_DATA["facility"]["ash_content_pct"])
         )
         ENHANCED_INPUT_DATA["facility"]["ash_content_pct"] = ash_choice
         
@@ -322,7 +320,9 @@ This tool evaluates the economic and environmental performance of a gasification
                 "Capacity Factor": data["capacity_factor"]
             })
         df_feedstock = pd.DataFrame(feedstock_rows)
-        st.dataframe(format_numbers(df_feedstock, "{:,.0f}"))
+        # This might be all numeric, so it's safe to use format_numbers if you like.
+        # But let's keep it minimal and safe:
+        st.dataframe(df_feedstock)
         
         st.write("### Multi-Feedstock Approach")
         multi_list = []
@@ -334,7 +334,10 @@ This tool evaluates the economic and environmental performance of a gasification
                 "Facility GHG (kgCO2/ton)": v["ghg_facility_kg_per_ton"]
             })
         df_multi_list = pd.DataFrame(multi_list)
-        st.dataframe(format_numbers(df_multi_list))
+        
+        # MINIMAL CHANGE: do NOT apply numeric formatting to df_multi_list
+        # because "Feedstock" is text, "Fraction" is numeric, etc. 
+        st.dataframe(df_multi_list)
         
         show_footer()
 
@@ -359,7 +362,6 @@ This tool evaluates the economic and environmental performance of a gasification
             ghg_proj = compute_project_ghg_tons(daily_capacity, FEEDSTOCKS, ENHANCED_INPUT_DATA)
             ghg_reduction = max(0, ghg_bau - ghg_proj)
 
-            # Use the fee_mode from the Base Input tab
             fee_mode = st.session_state.get("fee_mode", "Both")
             revs = compute_revenue_pie(daily_capacity, FEEDSTOCKS, ENHANCED_INPUT_DATA, fee_mode=fee_mode)
             
@@ -380,7 +382,8 @@ This tool evaluates the economic and environmental performance of a gasification
                 "Water Usage (m³/year)": water_usage,
                 "Particulate Emissions (kg/year)": particulate_emissions
             }])
-            st.dataframe(format_numbers(df_single))
+            # This DF is purely numeric except for the column names
+            st.dataframe(format_numbers(df_single))  # safe to format
             
             fig = px.bar(
                 df_single,
@@ -431,7 +434,7 @@ This tool evaluates the economic and environmental performance of a gasification
                             "Revenue Tipping": rev_dict_["Tipping"]
                         })
                 df_multi = pd.DataFrame(scenario_list)
-                st.dataframe(format_numbers(df_multi))
+                st.dataframe(format_numbers(df_multi))  # This DF is numeric or numeric-likely
                 st.session_state["scenario_df"] = df_multi
                 st.success("Multi-scenario run complete!")
         show_footer()
@@ -544,7 +547,6 @@ This tool evaluates the economic and environmental performance of a gasification
             carbon_ca = st.number_input("Carbon Price (USD/t CO2)", 0.0, 300.0, 10.0, 5.0, key="carbon_ca")
             disc_ca = st.number_input("Discount Rate (%)", 0.0, 50.0, 8.0, 1.0, key="disc_ca")
         with colC2:
-            # Additional dynamic pricing or cost input options can be added here.
             pass
 
         ghg_bau_ca = compute_bau_ghg_tons(daily_cap_ca, ENHANCED_INPUT_DATA)
@@ -624,10 +626,6 @@ This tool evaluates the economic and environmental performance of a gasification
                 pdf.cell(0, 8, title_str, ln=True)
                 pdf.set_font("Arial", "", 11)
                 pdf.ln(2)
-                # Convert the DataFrame to string with commas for clarity
-                # We'll just do to_string() plus format
-                # (Note that PDF can't do fancy HTML, so we'll do textual formatting)
-                # For simplicity, just do df.to_string(index=False)
                 for line in df.to_string(index=False).split("\n"):
                     pdf.cell(0, 5, line, ln=True)
                 pdf.ln(5)
