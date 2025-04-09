@@ -119,9 +119,8 @@ for y in range(6, 21):
 # ---------------------------
 def show_footer():
     st.markdown("""
----
-**Operated by Oporto-Carbon | Designed & Developed by Dr. Avi Luvchik**  
-@ All Rights Reserved 2025
+
+
 """)
 
 def compute_bau_ghg_tons(daily_capacity, input_data):
