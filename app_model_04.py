@@ -272,7 +272,7 @@ This tool evaluates the economic and environmental performance of a gasification
         flat_input = flatten_dict(ENHANCED_INPUT_DATA)
         df_input = pd.DataFrame(list(flat_input.items()), columns=["Parameter", "Value"])
         st.write("### Core Input Parameters (Default)")
-        st.dataframe(format_numbers(df_input, "{:,.0f}"))  # Show as comma integers
+        st.dataframe(df_input)  # no style formatting
         
         # Let the user override certain parameters
         st.write("### Override Key Parameters with Dropdowns")
