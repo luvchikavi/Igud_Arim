@@ -236,8 +236,7 @@ def main():
             except Exception as e:
                 st.error(f"Error loading logo: {e}")
     st.markdown("""
-Welcome to Oporto-Carbon's Gasification Feasibility Tool.  
-This tool evaluates the economic and environmental performance of a gasification facility.
+
 """)
     show_footer()
     
