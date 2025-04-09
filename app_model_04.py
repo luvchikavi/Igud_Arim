@@ -119,9 +119,20 @@ for y in range(6, 21):
 # ---------------------------
 def show_footer():
     st.markdown("""
-
-
+---
+**Operated by Oporto-Carbon | Designed & Developed by Dr. Avi Luvchik**  
+@ All Rights Reserved 2025
 """)
+
+def format_numbers(df, fmt="{:,.2f}"):
+    """
+    Applies comma formatting to all numeric columns in df 
+    with the given format string (default two decimals).
+    """
+    if df is None or df.empty:
+        return df
+    # Convert numeric columns to the specified format
+    return df.style.format(fmt)
 
 def compute_bau_ghg_tons(daily_capacity, input_data):
     days = input_data["facility"]["operational_days"]
@@ -194,7 +205,6 @@ def compute_revenue_pie(daily_capacity, feedstocks, input_data, fee_mode="Both")
     return {
         "Carbon": carbon_rev,
         "Electricity": elec_rev,
-        # Summarize each separately, so user can see them in scenario results:
         "Municipal": municipal_rev,
         "Tipping": tipping_rev
     }
@@ -234,10 +244,13 @@ def main():
                 st.image("oporto_logo.png", use_container_width=True)
             except Exception as e:
                 st.error(f"Error loading logo: {e}")
-    st.markdown("""
 
+        # Show welcome text ONLY on the first page
+        st.markdown("""
+Welcome to Oporto-Carbon's Gasification Feasibility Tool.  
+This tool evaluates the economic and environmental performance of a gasification facility.
 """)
-    show_footer()
+        show_footer()
     
     ###########################################################################
     # TAB 1: BASE INPUT DATA
@@ -259,7 +272,7 @@ def main():
         flat_input = flatten_dict(ENHANCED_INPUT_DATA)
         df_input = pd.DataFrame(list(flat_input.items()), columns=["Parameter", "Value"])
         st.write("### Core Input Parameters (Default)")
-        st.dataframe(df_input, use_container_width=True)
+        st.dataframe(format_numbers(df_input, "{:,.0f}"))  # Show as comma integers
         
         # Let the user override certain parameters
         st.write("### Override Key Parameters with Dropdowns")
@@ -281,8 +294,7 @@ def main():
         )
         ENHANCED_INPUT_DATA["facility"]["ash_content_pct"] = ash_choice
         
-        # Also let the user choose electricity output for RDF: 550 or 800 (the client requested 800)
-        # We'll apply it to facility as well as the FEEDSTOCKS dictionary
+        # Also let the user choose electricity output for RDF: 550 or 800
         elec_options = [550, 800]
         elec_choice = st.selectbox(
             "Electricity Generation (kWh/ton)", elec_options,
@@ -309,7 +321,8 @@ def main():
                 "Daily Feedstock (t/day)": data["daily_feedstock_tons"],
                 "Capacity Factor": data["capacity_factor"]
             })
-        st.dataframe(pd.DataFrame(feedstock_rows), use_container_width=True)
+        df_feedstock = pd.DataFrame(feedstock_rows)
+        st.dataframe(format_numbers(df_feedstock, "{:,.0f}"))
         
         st.write("### Multi-Feedstock Approach")
         multi_list = []
@@ -320,7 +333,8 @@ def main():
                 "Electricity (kWh/ton)": v["electricity_kwh_per_ton"],
                 "Facility GHG (kgCO2/ton)": v["ghg_facility_kg_per_ton"]
             })
-        st.dataframe(pd.DataFrame(multi_list), use_container_width=True)
+        df_multi_list = pd.DataFrame(multi_list)
+        st.dataframe(format_numbers(df_multi_list))
         
         show_footer()
 
@@ -366,11 +380,14 @@ def main():
                 "Water Usage (m³/year)": water_usage,
                 "Particulate Emissions (kg/year)": particulate_emissions
             }])
-            st.dataframe(df_single)
+            st.dataframe(format_numbers(df_single))
             
-            fig = px.bar(df_single, x=["GHG BAU (t)", "GHG Project (t)"],
-                         title="GHG Emissions Comparison",
-                         labels={"value": "Tons CO2eq", "variable": "Scenario"})
+            fig = px.bar(
+                df_single,
+                x=["GHG BAU (t)", "GHG Project (t)"],
+                title="GHG Emissions Comparison",
+                labels={"value": "Tons CO2eq", "variable": "Scenario"}
+            )
             st.plotly_chart(fig, use_container_width=True)
             
             rev_df = pd.DataFrame({
@@ -414,7 +431,7 @@ def main():
                             "Revenue Tipping": rev_dict_["Tipping"]
                         })
                 df_multi = pd.DataFrame(scenario_list)
-                st.dataframe(df_multi)
+                st.dataframe(format_numbers(df_multi))
                 st.session_state["scenario_df"] = df_multi
                 st.success("Multi-scenario run complete!")
         show_footer()
@@ -470,7 +487,7 @@ def main():
                     "Net CF (USD)": net_cf
                 })
             df_yby = pd.DataFrame(results_list)
-            st.dataframe(df_yby)
+            st.dataframe(format_numbers(df_yby))
             st.line_chart(df_yby.set_index("Year")[["GHG BAU (t)", "GHG Project (t)"]])
             st.session_state["yearbyyear_df"] = df_yby
             st.success("Year-by-year analysis complete!")
@@ -511,7 +528,7 @@ def main():
                 mc_results.append(net_annual)
             df_mc = pd.DataFrame({"Annual Net Cash Flow (USD)": mc_results})
             st.write("### Monte Carlo Simulation Results Summary")
-            st.write(df_mc.describe())
+            st.write(format_numbers(df_mc))
             st.bar_chart(df_mc)
             st.session_state["monte_carlo_df"] = df_mc
         show_footer()
@@ -539,9 +556,11 @@ def main():
         total_rev_ca = sum(revs_ca.values())
         base_opex = ENHANCED_INPUT_DATA["economics"]["base_opex_usd_per_year"]
         annual_net_ca = total_rev_ca - base_opex
-        flows_ca = discounted_cash_flow_series(annual_net_ca,
-                                               ENHANCED_INPUT_DATA["financing"]["project_duration_years"],
-                                               disc_ca)
+        flows_ca = discounted_cash_flow_series(
+            annual_net_ca,
+            ENHANCED_INPUT_DATA["financing"]["project_duration_years"],
+            disc_ca
+        )
         capex = ENHANCED_INPUT_DATA["economics"]["capex_usd"]
         npv_ca = sum(flows_ca) - capex
 
@@ -560,7 +579,7 @@ def main():
             "IRR (%)": irr_ca
         }
         df_cost = pd.DataFrame([cost_dict])
-        st.dataframe(df_cost)
+        st.dataframe(format_numbers(df_cost))
         st.session_state["cost_analysis_df"] = df_cost
         show_footer()
     
@@ -605,6 +624,10 @@ def main():
                 pdf.cell(0, 8, title_str, ln=True)
                 pdf.set_font("Arial", "", 11)
                 pdf.ln(2)
+                # Convert the DataFrame to string with commas for clarity
+                # We'll just do to_string() plus format
+                # (Note that PDF can't do fancy HTML, so we'll do textual formatting)
+                # For simplicity, just do df.to_string(index=False)
                 for line in df.to_string(index=False).split("\n"):
                     pdf.cell(0, 5, line, ln=True)
                 pdf.ln(5)
