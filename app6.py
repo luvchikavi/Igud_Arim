@@ -33,12 +33,16 @@ if 'authenticated' not in st.session_state or not st.session_state['authenticate
 # ---------------------------
 # 2. BASELINE DATA
 # ---------------------------
+# Original defaults
 BASELINE_DATA = {
     "facility": {
         "daily_capacity_tons": 330,
         "operational_days": 300,
         "ash_content_pct": 5,
-        "electricity_generation_kwh_per_ton": 550,
+        "electricity_generation_kwh_per_ton": 550,  # For revenue generation only
+        # We add new parameters for the alternative (syngas-based) approach
+        "own_use_kwh_per_ton": 100.0,       # The client mentioned ~100 kWh/ton
+        "co2_factor_kg_per_kwh": 0.4        # 0.4 kg CO₂ per kWh for syngas-based power
     },
     "economics": {
         "capex_usd": 100_000_000,
@@ -52,11 +56,14 @@ BASELINE_DATA = {
         "project_duration_years": 20,
     },
     "ghg_baseline": {
-        "landfill_emissions_kg_per_ton": 1721,
-        "facility_emissions_kg_per_ton": 566.5,
+        # Original defaults:
+        "landfill_emissions_kg_per_ton": 1721,  # Old method
+        "facility_emissions_kg_per_ton": 566.5, # Old method
+        # Also define the "alternative" recommended by client
+        "landfill_emissions_alternative_kg_per_ton": 1000
     },
     "trucking": {
-        "truck_capacity_tons": 15,
+        "truck_capacity_tons": 15,          # Original
         "distance_to_landfill_km": 400,
         "emission_factor_kgco2_per_km": 2.26
     },
@@ -68,6 +75,7 @@ BASELINE_DATA = {
 # A copy of BASELINE_DATA that we'll override in the UI
 override_data = copy.deepcopy(BASELINE_DATA)
 
+# FEEDSTOCK definitions for electricity & facility GHG (original approach).
 FEEDSTOCKS = {
     "RDF": {
         "electricity_kwh_per_ton": 550,
@@ -79,6 +87,7 @@ FEEDSTOCKS = {
     }
 }
 
+# Yearly feedstock data (for the Year-by-Year tab)
 YEARLY_FEEDSTOCK_DATA = {
     1: {"daily_feedstock_tons": 200, "capacity_factor": 0.80},
     2: {"daily_feedstock_tons": 250, "capacity_factor": 0.85},
@@ -116,10 +125,22 @@ def format_numbers(df, fmt="{:,.2f}"):
     return df.style.format({col: fmt for col in numeric_cols})
 
 def compute_bau_ghg_tons(daily_capacity, data):
+    """
+    Computes 'Business As Usual' GHG: 
+    1) Landfill emissions from the waste
+    2) Trucking to landfill
+    """
     days = data["facility"]["operational_days"]
     annual_waste = daily_capacity * days
-    ghg_landfill_kg = data["ghg_baseline"]["landfill_emissions_kg_per_ton"] * annual_waste
 
+    # Landfill Emission Factor
+    # We will assume the user might have chosen either the original 1721, the alternative 1000,
+    # or a custom override in override_data. 
+    landfill_ef = data["ghg_baseline"]["landfill_emissions_kg_per_ton"]  # final chosen override
+
+    ghg_landfill_kg = landfill_ef * annual_waste
+
+    # Trucking
     truck_capacity = data["trucking"]["truck_capacity_tons"]
     distance = data["trucking"]["distance_to_landfill_km"]
     ef_truck = data["trucking"]["emission_factor_kgco2_per_km"]
@@ -129,27 +150,57 @@ def compute_bau_ghg_tons(daily_capacity, data):
     return (ghg_landfill_kg + ghg_trucking_kg) / 1000.0
 
 def compute_project_ghg_tons(daily_capacity, feedstocks, data):
+    """
+    Computes GHG from the project scenario:
+    1) Facility emissions
+    2) Local trucking (20 km assumed in original)
+    """
     days = data["facility"]["operational_days"]
     annual_waste = daily_capacity * days
 
-    rdf_frac = data["feedstocks"]["RDF_fraction"]
-    green_frac = 1.0 - rdf_frac
+    # Here we handle two possible approaches to facility emissions:
+    #  - Original "fixed" approach from feedstocks (566.5 kg/ton) 
+    #    for each feedstock fraction.
+    #  - A consumption-based approach: 
+    #    (100 kWh/ton) * (0.4 kg CO₂/kWh) = 40 kg CO₂/ton
+    #    or any user-defined override.
+    # 
+    # We'll check a new key we store in data["ghg_baseline"]["facility_emission_method"]
+    # If "original", we sum feedstocks. Otherwise, we do consumption-based.
 
-    total_fac_ghg_kg = 0.0
-    for ftype, finfo in feedstocks.items():
-        if ftype == "RDF":
-            portion = annual_waste * rdf_frac
-        else:
-            portion = annual_waste * green_frac
-        ghg_fac = finfo["ghg_facility_kg_per_ton"]
-        total_fac_ghg_kg += ghg_fac * portion
+    facility_emission_method = data["ghg_baseline"].get("facility_emission_method", "original")
 
+    if facility_emission_method == "original":
+        # Original approach: partial for RDF & GreenWaste
+        rdf_frac = data["feedstocks"]["RDF_fraction"]
+        green_frac = 1.0 - rdf_frac
+        total_fac_ghg_kg = 0.0
+        for ftype, finfo in feedstocks.items():
+            if ftype == "RDF":
+                portion = annual_waste * rdf_frac
+            else:
+                portion = annual_waste * green_frac
+            ghg_fac = finfo["ghg_facility_kg_per_ton"]  # e.g. 566.5
+            total_fac_ghg_kg += ghg_fac * portion
+    elif facility_emission_method == "consumption":
+        # Calculation approach
+        kwh_per_ton = data["facility"]["own_use_kwh_per_ton"]
+        co2_factor = data["facility"]["co2_factor_kg_per_kwh"]
+        total_fac_ghg_kg = annual_waste * kwh_per_ton * co2_factor
+    else:
+        # Potentially a fixed custom user override, stored in "facility_emissions_kg_per_ton" directly.
+        # If user picks "custom_fixed", we rely on the single "facility_emissions_kg_per_ton"
+        # from override_data
+        custom_factor = data["ghg_baseline"]["facility_emissions_kg_per_ton"]
+        total_fac_ghg_kg = custom_factor * annual_waste
+
+    # Local trucking (20 km) remains the same logic
     local_distance_km = 20.0
     ef_truck = data["trucking"]["emission_factor_kgco2_per_km"]
     truck_capacity = data["trucking"]["truck_capacity_tons"]
     trucks_per_year = annual_waste / truck_capacity
     ghg_local_kg = trucks_per_year * local_distance_km * ef_truck
-    
+
     return (total_fac_ghg_kg + ghg_local_kg) / 1000.0
 
 def compute_revenue_pie(daily_capacity, feedstocks, data):
@@ -158,6 +209,7 @@ def compute_revenue_pie(daily_capacity, feedstocks, data):
     rdf_frac = data["feedstocks"]["RDF_fraction"]
     green_frac = 1.0 - rdf_frac
 
+    # Electricity revenue uses feedstock electricity_kwh_per_ton from FEEDSTOCKS
     total_kwh = 0.0
     for ftype, finfo in feedstocks.items():
         if ftype == "RDF":
@@ -327,36 +379,99 @@ This tool evaluates the economic and environmental performance of a gasification
         )
         override_data["feedstocks"]["RDF_fraction"] = rdf_frac_choice
 
-        # 6) Truck capacity
-        truck_capacity_choice = st.number_input(
-            "Truck Capacity (tons)",
-            min_value=5,
-            max_value=50,
-            value=override_data["trucking"]["truck_capacity_tons"],
-            step=1
+        st.markdown("### Landfill Emission Factor (BAU)")
+        landfill_choice = st.radio(
+            "Select Landfill Emission Factor",
+            ("Original (1721)", "Client-based (1000)", "Custom"),
+            index=0
         )
-        override_data["trucking"]["truck_capacity_tons"] = truck_capacity_choice
+        if landfill_choice == "Original (1721)":
+            override_data["ghg_baseline"]["landfill_emissions_kg_per_ton"] = 1721
+        elif landfill_choice == "Client-based (1000)":
+            override_data["ghg_baseline"]["landfill_emissions_kg_per_ton"] = 1000
+        else:
+            custom_landfill = st.number_input(
+                "Custom Landfill Emissions (kg CO2/ton)",
+                min_value=0,
+                max_value=3000,
+                value=int(override_data["ghg_baseline"]["landfill_emissions_kg_per_ton"]),
+                step=50
+            )
+            override_data["ghg_baseline"]["landfill_emissions_kg_per_ton"] = custom_landfill
 
-        # 7) Distance to landfill
-        distance_choice = st.number_input(
-            "Distance to landfill (km)",
-            min_value=50,
-            max_value=2000,
-            value=override_data["trucking"]["distance_to_landfill_km"],
-            step=50
+        st.markdown("### Facility Emissions (Project)")
+        facility_emission_choice = st.radio(
+            "Select Facility Emission Approach",
+            ("Original (fixed 566.5)", "Consumption-based (100 kWh * 0.4)", "Custom Fixed"),
+            index=0
         )
-        override_data["trucking"]["distance_to_landfill_km"] = distance_choice
+        if facility_emission_choice == "Original (fixed 566.5)":
+            override_data["ghg_baseline"]["facility_emission_method"] = "original"
+            # We'll keep the original 566.5 in the feedstocks or override
+            override_data["ghg_baseline"]["facility_emissions_kg_per_ton"] = 566.5
+        elif facility_emission_choice == "Consumption-based (100 kWh * 0.4)":
+            override_data["ghg_baseline"]["facility_emission_method"] = "consumption"
+            # Let the user override the consumption or factor if desired
+            own_use_choice = st.number_input(
+                "Facility Own-Use Electricity (kWh/ton)",
+                min_value=0.0,
+                max_value=200.0,
+                value=override_data["facility"]["own_use_kwh_per_ton"],
+                step=10.0
+            )
+            override_data["facility"]["own_use_kwh_per_ton"] = own_use_choice
 
-        # 8) Electricity generation (kWh/ton)
+            co2_factor_choice = st.number_input(
+                "CO₂ Factor (kg CO2/kWh for syngas)",
+                min_value=0.0,
+                max_value=1.0,
+                value=override_data["facility"]["co2_factor_kg_per_kwh"],
+                step=0.05
+            )
+            override_data["facility"]["co2_factor_kg_per_kwh"] = co2_factor_choice
+        else:
+            override_data["ghg_baseline"]["facility_emission_method"] = "custom_fixed"
+            custom_fac = st.number_input(
+                "Custom Facility Emissions (kg CO2/ton)",
+                min_value=0.0,
+                max_value=2000.0,
+                value=override_data["ghg_baseline"]["facility_emissions_kg_per_ton"],
+                step=50.0
+            )
+            override_data["ghg_baseline"]["facility_emissions_kg_per_ton"] = custom_fac
+
+        st.markdown("### Truck Capacity Options")
+        truck_choice = st.radio(
+            "Select Truck Capacity (tons)",
+            ("Original 15", "18", "30", "Custom"),
+            index=0
+        )
+        if truck_choice == "Original 15":
+            override_data["trucking"]["truck_capacity_tons"] = 15
+        elif truck_choice == "18":
+            override_data["trucking"]["truck_capacity_tons"] = 18
+        elif truck_choice == "30":
+            override_data["trucking"]["truck_capacity_tons"] = 30
+        else:
+            custom_truck = st.number_input(
+                "Custom Truck Capacity (tons)",
+                min_value=5,
+                max_value=60,
+                value=override_data["trucking"]["truck_capacity_tons"],
+                step=1
+            )
+            override_data["trucking"]["truck_capacity_tons"] = custom_truck
+
+        # 8) Electricity generation (kWh/ton) (for revenue)
         elec_gen_choice = st.number_input(
-            "Electricity Generation (kWh/ton)",
+            "Electricity Generation (kWh/ton) for Revenue",
             min_value=100,
             max_value=2000,
             value=override_data["facility"]["electricity_generation_kwh_per_ton"],
             step=50
         )
         override_data["facility"]["electricity_generation_kwh_per_ton"] = elec_gen_choice
-        # Also update FEEDSTOCKS references if needed:
+        # Update feedstock references if needed for the original approach to revenue
         FEEDSTOCKS["RDF"]["electricity_kwh_per_ton"] = elec_gen_choice
         FEEDSTOCKS["GreenWaste"]["electricity_kwh_per_ton"] = elec_gen_choice
 
