@@ -382,12 +382,12 @@ This tool evaluates the economic and environmental performance of a gasification
         st.markdown("### Landfill Emission Factor (BAU)")
         landfill_choice = st.radio(
             "Select Landfill Emission Factor",
-            ("Original (1721)", "Client-based (1000)", "Custom"),
+            ("Original (1721)", "EPA-based (1000)", "Custom"),
             index=0
         )
         if landfill_choice == "Original (1721)":
             override_data["ghg_baseline"]["landfill_emissions_kg_per_ton"] = 1721
-        elif landfill_choice == "Client-based (1000)":
+        elif landfill_choice == "EPA-based (1000)":
             override_data["ghg_baseline"]["landfill_emissions_kg_per_ton"] = 1000
         else:
             custom_landfill = st.number_input(
