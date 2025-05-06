@@ -386,16 +386,8 @@ This tool evaluates the economic and environmental performance of a gasification
             )
             override_data["ghg_baseline"]["facility_emissions_kg_per_ton"] = custom_fac
 
-        # 4) RDF fraction (now after facility approach, but still relevant if feedstock-based)
-        st.markdown("### Feedstock Fraction (RDF vs. GreenWaste)")
-        rdf_frac_choice = st.slider(
-            "RDF Fraction (the remainder is GreenWaste)",
-            min_value=0.0,
-            max_value=1.0,
-            value=override_data["feedstocks"]["RDF_fraction"],
-            step=0.05
-        )
-        override_data["feedstocks"]["RDF_fraction"] = rdf_frac_choice
+        
+        override_data["feedstocks"]["RDF_fraction"] = 0.7
 
         # 5) Landfill Emission Factor (BAU)
         st.markdown("### Landfill Emission Factor (BAU)")
